@@ -3,7 +3,7 @@
 * **Type**: Design proposal
 * **Author**: Alejandro Serrano
 * **Contributors**: Mikhail Zarechenskii
-* **Discussion**: ??
+* **Discussion**: [KEEP-371](https://github.com/Kotlin/KEEP/issues/371)
 
 ## Abstract
 
