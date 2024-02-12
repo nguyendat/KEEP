@@ -17,6 +17,7 @@ We propose an extension of branches in `when` expressions with subject, which un
   * [Clarity over power](#clarity-over-power)
   * [One little step](#one-little-step)
 * [Technical details](#technical-details)
+  * [The need for `else`](#the-need-for-else)
   * [Alternative syntax](#alternative-syntax)
 * [Exhaustiveness checking](#exhaustiveness-checking)
 * [Potential extensions](#potential-extensions)
@@ -55,6 +56,9 @@ corresponding subclass of `Status`.
 Using a `when` expression with subject has one important limitation, though: each branch must
 depend on a _single condition over the subject_. _Guards_ remove this limitation, so you
 can introduce additional conditions, separated with `&&` from the subject condition.
+
+> In the following examples we use `&&`, but the syntax is not yet definitive.
+> Another option is using `if` as the keyword introducing the guard.
 
 ```kotlin
 fun render(status: Status): String = when (status) {
@@ -132,7 +136,8 @@ This example also shows that the combination of `else` with a guard
 -- in other words, a branch that does not inspect the subject --
 is done with special `else if` syntax.
 
-Second, we do not allow disjunctions (`||`) directly in a guard.
+Second, if we choose `&&` as the keyword introducing a guard,
+we do not allow disjunctions (`||`) in the expression afterward.
 The following is an example of a branch condition that may be
 difficult to understand, because `||` usually has lower priority
 than `&&` when used in expressions.
@@ -165,12 +170,13 @@ whenEntry : whenCondition [{NL} whenEntryAddition] {NL} '->' {NL} controlStructu
           | 'else' [ 'if' expression ] {NL} '->' {NL} controlStructureBody [semi]
 
 whenEntryAddition: ',' [ {NL} whenCondition { {NL} ',' {NL} whenCondition} ] 
-                 | '&&' {NL} conjunction
+                 | '&&' {NL} conjunction  // using '&&'
+                 | 'if' {NL} expression   // using 'if'
 ```
 
-Entries with guards (that is, using `&&` or `else if`) may only appear in `when` expressions with a subject.
+Entries with guards (that is, using `&&`/`if` or `else if`) may only appear in `when` expressions with a subject.
 
-We use `equality` instead of `expression` in the second line to prevent ambiguities; as a result, parentheses are required when a disjunction is used as guard expression.
+We use `conjunction` instead of `expression` in the case of `&&` to prevent ambiguities; as a result, parentheses are required when a disjunction is used as guard expression.
 
 ```kotlin
 when (s) {
@@ -178,8 +184,7 @@ when (s) {
 }
 ```
 
-The behavior of a `when` expression with guards is equivalent to the same expression in which the subject has been inlined in every location,
-and `else if` has been replaced with the guard expression itself. The first version of the motivating example is equivalent to:
+The behavior of a `when` expression with guards is equivalent to the same expression in which the subject has been inlined in every location, `if` has been replaced by `&&`, and `else` by `true` (or more succintly, `else if` is replaced by the expression following it). The first version of the motivating example is equivalent to:
 
 ```kotlin
 fun render(status: Status): String = when {
@@ -194,7 +199,21 @@ fun render(status: Status): String = when {
 }
 ```
 
-The current rules for smart casting imply that any data- and control-flow information gathered in the left-hand side of `&&` is available on the right-hand side (for example, when you do `list != null && list.isNotEmpty()`).
+The current rules for smart casting imply that any data- and control-flow information gathered in the left-hand side is available on the right-hand side (for example, when you do `list != null && list.isNotEmpty()`).
+
+### The need for `else`
+
+The current document proposes using `else if` when there is no matching in the subject, only a side condition.
+One promising avenue is to drop the `else`, or even the whole `else if` entirely.
+Alas, this creates a problem with the current grammar, which allows _any_ expression to appear as a condition.
+
+```kotlin
+fun weird(x: Int) = when (x) {
+  0 -> "a"
+  if (something()) 1 else 2 -> "b"
+  else -> "c"
+}
+```
 
 ### Alternative syntax
 
@@ -205,13 +224,24 @@ in order to inform our final decision.
 - Uniformly using `&&`: `else && condition` looks quite alien, `else if` is a well-known concept.
 - Uniformly using `if`:
   - Pro: delineates the guard much more clearly than `&&`.
-  - Con: writing several conditions in `if` or a `when` without subject is already done with `&&`.
+  - Con: writing several conditions in `if` or a `when` without subject is currently done with `&&`.
+  
+      ```kotlin
+      when (x) { is List if x.isEmpty() -> ... }
+      // as opposed to
+      if (x is List && x.isEmpty()) { ... }
+      when { x is List && x.isEmpty() -> ... }
+      ```
+- Using `when`:
+  - Pro: they are already keywords, so the change to the grammar is easy.
+  - Pro: similar to Java and C#.
 - Using another keyword:
   - Similar to uniformly using `if`, with the potential disadvantage of having a new keyword.
 
 ## Exhaustiveness checking
 
-Cases like `Status::render` above point out that we may want more powerful exhaustiveness checking that we have now, which is only limited to the subject of `when`.
+Cases like `Status::render` above point out that we may want more powerful exhaustiveness checking that we have now,
+which is only limited to the subject of `when`.
 For example, if we forget the last `else` in the example introduced at the beginning of this proposal, we should get:
 
 ```kotlin
@@ -220,9 +250,96 @@ Add the necessary 'is Error && status.problem == UNKNOWN' branch,
 or 'else' branch instead.
 ```
 
-Although not strictly part of this proposal, we have created a [sibling issue](https://youtrack.jetbrains.com/issue/KT-63696/Improved-exhaustiveness-checking)
-to improve exhaustiveness checking in several directions, including the aforementioned one.
-The core of that improved algorithm is to consider not only the subject of the `when` expression, but also any stable reference mentioned in the branches.
+We propose extending the current exhaustiveness check analysis to account not only for the type of the subject
+but also every [stable reference](https://kotlinlang.org/spec/type-inference.html#smart-cast-sink-stability)
+appearing on it. That includes immutable properties, among others.
+
+In the following description, we assume that every `when` expression has been written or
+translated to a form in which each branch is headed by a conjunction of expressions, or
+is simply `else`.
+
+```kotlin
+when {
+  e1 && e2 && ... ->
+  f1 && f2 && ... ->
+  ...
+}
+```
+
+The exhaustiveness check may consider only those branches in which _every_ condition is of
+one of the following forms.
+
+- `r == <literal>` or `r == <enum entry>`,
+- `r is Type`,
+- `r == null` or `r != null`,
+- `r` or `!r`, if `r` is of Boolean type,
+
+and where `r` is a _reference_, that is, is either the original subject of the `when` expression,
+or a stable reference.
+
+If should then proceed to check that the cartesian product of all the potential types of the
+references are _covered_, as per the current exhaustiveness check. For example, the following should
+be considered exhaustive:
+
+```kotlin
+fun f(x: Int?, y: Int?): Int = when {
+  x == null && y == null -> 0
+  x != null && y == null -> x
+  x == null && y != null -> y
+  x != null && y != null -> x + y
+}
+```
+
+This proposal does not mandate a particular implementation. However, this is a potential algorithm.
+First, we extract all the references in the remaining expressions and perform a topological sort,
+so that `x` appears before `x.property`. Then we execute `coveredBy(references, branchConditions)`,
+given by the following pseudocode.
+
+```kotlin
+coveredBy(<empty list>, _) = OK
+coveredBy(r + rest, branchConditions) {
+  val useful = branchConditions.filter { r appears }
+  val groups = group(branchConditions) { condition on r }
+
+  val coveredConditions = mutableListOf()
+  for ((condition, group) in groups) {
+    val smallerConditions = group.map { remove condition from it }
+    if coveredBy(rest, smallerConditions) {
+      coveredConditions.add(condition)
+    }
+  }
+
+  if !(coveredCondition covers type(r)) FAIL
+}
+```
+
+The previous example using `x` and `y` would proceed as follows:
+
+```
+coveredBy([x, y], [x == null && y == null, ...])
+-> go with r = x
+  -> group with x == null
+     smallerConditions = [ y == null, y != null ]
+
+    -> coveredBy(y, [ y == null, y != null ])
+      -> go with r = y
+        -> group with y == null
+           smallerConditions = [] -> OK
+        -> group with y != null
+           smallerConditions = [] -> OK
+    
+    -> add x == null to coveredConditions
+
+  -> group with x != null
+     smallerConditions = [ y == null, y != null ]
+
+    -> coveredBy(y, [ y == null, y != null ])
+       // same as above
+    -> add x != null to coveredConditions
+
+  -> does [ x == null, x != null ] cover `Int?`
+     -> YES -> return OK
+```
 
 ## Potential extensions
 
