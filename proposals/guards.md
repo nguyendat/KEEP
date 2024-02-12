@@ -319,26 +319,27 @@ The previous example using `x` and `y` would proceed as follows:
 coveredBy([x, y], [x == null && y == null, ...])
 -> go with r = x
   -> group with x == null
-     smallerConditions = [ y == null, y != null ]
-
-    -> coveredBy(y, [ y == null, y != null ])
-      -> go with r = y
-        -> group with y == null
-           smallerConditions = [] -> OK
-        -> group with y != null
-           smallerConditions = [] -> OK
-    
-    -> add x == null to coveredConditions
+  |  smallerConditions = [ y == null, y != null ]
+  |
+  | -> coveredBy([y], [ y == null, y != null ])
+  |   -> go with r = y
+  |   | -> group with y == null
+  |   |    smallerConditions = [] -> OK
+  |   | -> group with y != null
+  |   |    smallerConditions = [] -> OK
+  | 
+  | -> add x == null to coveredConditions
 
   -> group with x != null
-     smallerConditions = [ y == null, y != null ]
-
-    -> coveredBy(y, [ y == null, y != null ])
-       // same as above
-    -> add x != null to coveredConditions
+  |  smallerConditions = [ y == null, y != null ]
+  |
+  | -> coveredBy([y], [ y == null, y != null ])
+  |    // same as above
+  | -> add x != null to coveredConditions
 
   -> does [ x == null, x != null ] cover `Int?`
-     -> YES -> return OK
+  | -> YES
+  -> return OK
 ```
 
 ## Potential extensions
