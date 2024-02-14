@@ -89,8 +89,25 @@ fun render(status: Status): String = when (status) {
 }
 ```
 
-Such code is harder to describe using a subject and nested control flow. It is possible to switch
-to a `when` expression without subject, but that obscures the fact that our control flow depends
+If we rewrite the code above using a subject and nested control flow, we need to
+_repeat_ some code. This hurts maintainability since we need to remember to 
+keep the two `"problem, try again"` in sync.
+
+```kotlin
+fun render(status: Status): String = when (status) {
+    Status.Loading -> "loading"
+    is Status.Ok ->
+      if (status.info.isNotEmpty()) status.info.joinToString()
+      else "problem, try again"
+    is Status.Ok && status.info.isNotEmpty() -> status.info.joinToString()
+    is Status.Error ->
+      if (status.isCritical) "critical problem"
+      else "problem, try again"
+}
+```
+
+It is possible to switch to a `when` expression without subject,
+but that obscures the fact that our control flow depends
 on the `Status` value.
 
 ```kotlin
