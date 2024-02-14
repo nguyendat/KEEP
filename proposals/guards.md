@@ -99,7 +99,6 @@ fun render(status: Status): String = when (status) {
     is Status.Ok ->
       if (status.info.isNotEmpty()) status.info.joinToString()
       else "problem, try again"
-    is Status.Ok && status.info.isNotEmpty() -> status.info.joinToString()
     is Status.Error ->
       if (status.isCritical) "critical problem"
       else "problem, try again"
