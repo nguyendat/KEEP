@@ -18,7 +18,7 @@ We propose an extension of branches in `when` expressions with subject, which un
   * [One little step](#one-little-step)
 * [Technical details](#technical-details)
   * [The need for `else`](#the-need-for-else)
-  * [Alternative syntax](#alternative-syntax)
+  * [Alternative syntax using `&&`](#alternative-syntax-using-)
 * [Exhaustiveness checking](#exhaustiveness-checking)
 * [Potential extensions](#potential-extensions)
 
@@ -55,19 +55,16 @@ corresponding subclass of `Status`.
 
 Using a `when` expression with subject has one important limitation, though: each branch must
 depend on a _single condition over the subject_. _Guards_ remove this limitation, so you
-can introduce additional conditions, separated with `&&` from the subject condition.
-
-> In the following examples we use `&&`, but the syntax is not yet definitive.
-> Another option is using `if` as the keyword introducing the guard.
+can introduce additional conditions, separated with `if` from the subject condition.
 
 ```kotlin
 fun render(status: Status): String = when (status) {
     Status.Loading -> "loading"
-    is Status.Ok && status.info.isEmpty() -> "no data"
+    is Status.Ok if status.info.isEmpty() -> "no data"
     is Status.Ok -> status.info.joinToString()
-    is Status.Error && status.problem == Problem.CONNECTION ->
+    is Status.Error if status.problem == Problem.CONNECTION ->
       "problems with connection"
-    is Status.Error && status.problem == Problem.AUTHENTICATION ->
+    is Status.Error if status.problem == Problem.AUTHENTICATION ->
       "could not be authenticated"
     else -> "unknown problem"
 }
@@ -83,8 +80,8 @@ below `render`s both non-critical problems and success with an empty list in the
 ```kotlin
 fun render(status: Status): String = when (status) {
     Status.Loading -> "loading"
-    is Status.Ok && status.info.isNotEmpty() -> status.info.joinToString()
-    is Status.Error && status.isCritical -> "critical problem"
+    is Status.Ok if status.info.isNotEmpty() -> status.info.joinToString()
+    is Status.Error if status.isCritical -> "critical problem"
     else -> "problem, try again"
 }
 ```
@@ -126,10 +123,10 @@ during candidate resolution.
 
 One important design goal of this proposal is to make code _clear_ to write and read.
 For that reason, we have consciously removed some of the potential corner cases.
-Furthermore, we are conducting a survey to ensure that guards are intuitively understood
+In addition, we have conducted a survey to ensure that guards are intuitively understood
 by a wide range of Kotlin developers.
 
-First, it is not allowed to mix several conditions (using `,`) and guards in a single branch.
+On that line, it is not allowed to mix several conditions (using `,`) and guards in a single branch.
 They can be used in the same `when` expression, though.
 Here is one example taken from [JEP-441](https://openjdk.org/jeps/441).
 
@@ -152,20 +149,14 @@ This example also shows that the combination of `else` with a guard
 -- in other words, a branch that does not inspect the subject --
 is done with special `else if` syntax.
 
-Second, if we choose `&&` as the keyword introducing a guard,
-we do not allow disjunctions (`||`) in the expression afterward.
-The following is an example of a branch condition that may be
-difficult to understand, because `||` usually has lower priority
-than `&&` when used in expressions.
+The reason behind this restriction is that the following condition
 
 ```kotlin
-is Status.Success && info.isEmpty || status is Status.Error
-// would be equivalent to
-is Status.Success && (info.isEmpty || status is Status.Error)
+condition1, condition2 if guard
 ```
 
-This does not mean that you cannot use disjunctions at all in guards.
-You are just required to introduce extra parentheses.
+is not immediately unambiguous. Is the `guard` checked only when
+`condition2` matches, or is it checked in every case?
 
 ### One little step
 
@@ -183,22 +174,15 @@ We extend the syntax of `whenEntry` in the following way.
 
 ```
 whenEntry : whenCondition [{NL} whenEntryAddition] {NL} '->' {NL} controlStructureBody [semi]
-          | 'else' [ 'if' expression ] {NL} '->' {NL} controlStructureBody [semi]
+          | 'else' [ whenEntryGuard ] {NL} '->' {NL} controlStructureBody [semi]
 
 whenEntryAddition: ',' [ {NL} whenCondition { {NL} ',' {NL} whenCondition} ] 
-                 | '&&' {NL} conjunction  // using '&&'
-                 | 'if' {NL} expression   // using 'if'
+                 | whenEntryGuard
+
+whenEntryGuard: 'if' {NL} expression
 ```
 
-Entries with guards (that is, using `&&`/`if` or `else if`) may only appear in `when` expressions with a subject.
-
-We use `conjunction` instead of `expression` in the case of `&&` to prevent ambiguities; as a result, parentheses are required when a disjunction is used as guard expression.
-
-```kotlin
-when (s) {
-    is String && (s == "" || s == "no") -> ...
-}
-```
+Entries with a guard may only appear in `when` expressions with a subject.
 
 The behavior of a `when` expression with guards is equivalent to the same expression in which the subject has been inlined in every location, `if` has been replaced by `&&`, and `else` by `true` (or more succintly, `else if` is replaced by the expression following it). The first version of the motivating example is equivalent to:
 
@@ -215,12 +199,12 @@ fun render(status: Status): String = when {
 }
 ```
 
-The current rules for smart casting imply that any data- and control-flow information gathered in the left-hand side is available on the right-hand side (for example, when you do `list != null && list.isNotEmpty()`).
+The current rules for smart casting imply that any data- and control-flow information gathered from the left-hand side is available on the right-hand side (for example, when you do `list != null && list.isNotEmpty()`).
 
 ### The need for `else`
 
 The current document proposes using `else if` when there is no matching in the subject, only a side condition.
-One promising avenue is to drop the `else`, or even the whole `else if` entirely.
+One seemingly promising avenue dropping the `else` keyword, or even the whole `else if` entirely.
 Alas, this creates a problem with the current grammar, which allows _any_ expression to appear as a condition.
 
 ```kotlin
@@ -231,28 +215,62 @@ fun weird(x: Int) = when (x) {
 }
 ```
 
-### Alternative syntax
+### Alternative syntax using `&&`
 
-We have considered other potential syntax for guards.
-We are conducting a survey to gather the opinions of a wide range of Kotlin developers,
-in order to inform our final decision.
+We have considered an alternative syntax using `&&` for non-`else` cases.
 
-- Uniformly using `&&`: `else && condition` looks quite alien, `else if` is a well-known concept.
-- Uniformly using `if`:
-  - Pro: delineates the guard much more clearly than `&&`.
-  - Con: writing several conditions in `if` or a `when` without subject is currently done with `&&`.
-  
-      ```kotlin
-      when (x) { is List if x.isEmpty() -> ... }
-      // as opposed to
-      if (x is List && x.isEmpty()) { ... }
-      when { x is List && x.isEmpty() -> ... }
-      ```
-- Using `when`:
-  - Pro: they are already keywords, so the change to the grammar is easy.
-  - Pro: similar to Java and C#.
-- Using another keyword:
-  - Similar to uniformly using `if`, with the potential disadvantage of having a new keyword.
+```kotlin
+fun render(status: Status): String = when (status) {
+    Status.Loading -> "loading"
+    is Status.Ok && status.info.isNotEmpty() -> status.info.joinToString()
+    is Status.Error && status.isCritical -> "critical problem"
+    else -> "problem, try again"
+}
+```
+
+This was considered as the primary syntax in the first iteration of the KEEP,
+but we have decided to go with uniform `if`.
+
+The main idea behind that choice was the similarity of a guard
+with the conjunction of two conditions in `if` or `when` without a subject.
+
+```kotlin
+when (x) { is List if x.isEmpty() -> ... }
+
+// as opposed to
+
+if (x is List && x.isEmpty()) { ... }
+when { x is List && x.isEmpty() -> ... }
+```
+
+However, that created problems when the guard was a disjunction.
+The following is an example of a branch condition that may be
+difficult to understand, because `||` usually has lower priority
+than `&&` when used in expressions.
+
+```kotlin
+is Status.Success && info.isEmpty || status is Status.Error
+// would be equivalent to
+is Status.Success && (info.isEmpty || status is Status.Error)
+```
+
+The solution -- requiring the additional parentheses -- creates
+some irregularity in the syntax.
+
+A second problem found was that `&&` created additional ambiguities
+when matching over Boolean expressions. In particular, it is not clear
+what the result of this expression should be.
+
+```kotlin
+when (b) {
+  false && false -> "a"
+  else -> "b"
+}
+```
+
+On the one hand, `false && false` could be evaluated to `false` and then
+compared with `b`. On the other hand, `b` can be compared with `false` first,
+and then check the guard -- so the code is actually unreachable.
 
 ## Exhaustiveness checking
 
@@ -262,7 +280,7 @@ For example, if we forget the last `else` in the example introduced at the begin
 
 ```kotlin
 error: 'when' expression must be exhaustive.
-Add the necessary 'is Error && status.problem == UNKNOWN' branch,
+Add the necessary 'is Error if status.problem == UNKNOWN' branch,
 or 'else' branch instead.
 ```
 
@@ -366,8 +384,8 @@ For example, you would not need to write `status.info.isNotEmpty()` in the secon
 ```kotlin
 fun render(status: Status): String = when (status) {
     Status.Loading -> "loading"
-    is Status.Ok && info.isNotEmpty() -> status.info.joinToString()
-    is Status.Error && isCritical -> "critical problem"
+    is Status.Ok if info.isNotEmpty() -> status.info.joinToString()
+    is Status.Error if isCritical -> "critical problem"
     else -> "problem, try again"
 }
 ```
