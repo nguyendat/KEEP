@@ -288,6 +288,11 @@ We propose extending the current exhaustiveness check analysis to account not on
 but also every [stable reference](https://kotlinlang.org/spec/type-inference.html#smart-cast-sink-stability)
 appearing on it. That includes immutable properties, among others.
 
+Furthermore, the [exhaustiveness check](https://kotlinlang.org/spec/expressions.html#exhaustive-when-expressions)
+is extended to work on every kind of `when` expression, not only those with subject. 
+Note that the requirement of whether a `when` expression must be exhaustive or not
+in a particular position in the code is _not_ modified.
+
 In the following description, we assume that every `when` expression has been written or
 translated to a form in which each branch is headed by a conjunction of expressions, or
 is simply `else`.
