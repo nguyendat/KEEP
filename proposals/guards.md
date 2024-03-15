@@ -17,6 +17,7 @@ We propose an extension of branches in `when` expressions with subject, which un
   * [Clarity over power](#clarity-over-power)
   * [One little step](#one-little-step)
 * [Technical details](#technical-details)
+  * [Style guide](#style-guide)
   * [The need for `else`](#the-need-for-else)
   * [Alternative syntax using `&&`](#alternative-syntax-using-)
 * [Exhaustiveness checking](#exhaustiveness-checking)
@@ -184,7 +185,7 @@ whenEntryGuard: 'if' {NL} expression
 
 Entries with a guard may only appear in `when` expressions with a subject.
 
-The behavior of a `when` expression with guards is equivalent to the same expression in which the subject has been inlined in every location, `if` has been replaced by `&&`, and `else` by `true` (or more succintly, `else if` is replaced by the expression following it). The first version of the motivating example is equivalent to:
+The behavior of a `when` expression with guards is equivalent to the same expression in which the subject has been inlined in every location, `if` has been replaced by `&&`, and `else` by `true` (or more succinctly, `else` if` is replaced by the expression following it). The first version of the motivating example is equivalent to:
 
 ```kotlin
 fun render(status: Status): String = when {
@@ -200,6 +201,29 @@ fun render(status: Status): String = when {
 ```
 
 The current rules for smart casting imply that any data- and control-flow information gathered from the left-hand side is available on the right-hand side (for example, when you do `list != null && list.isNotEmpty()`).
+
+### Style guide
+
+Even though `if` delineates the `whenCondition` part from the potential `guard`, there is still
+a possibility of confusion with complex Boolean expressions. For example, the code below may
+be wrongly as interpreted as taking the branch for both `Ok` status with an empty `info`
+or `Error` status; when the reality is that the second part of the disjunction is always false,
+since the guard is only checked if the condition (in this case, being `Ok`) is satisfied.
+
+```kotlin
+when (status) {
+  is Status.Ok if status.info.isEmpty() || status is Status.Error -> ...
+}
+```
+
+We strongly suggest writing parentheses around Boolean expressions after `if` as a way to
+clarify the situation.
+
+```kotlin
+when (status) {
+  is Status.Ok if (status.info.isEmpty() || status is Status.Error) -> ...
+}
+```
 
 ### The need for `else`
 
