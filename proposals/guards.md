@@ -298,6 +298,8 @@ and then check the guard -- so the code is actually unreachable.
 
 ## Exhaustiveness checking
 
+> Exhaustiveness checking has been separated to a different proposal.
+
 Cases like `Status::render` above point out that we may want more powerful exhaustiveness checking that we have now,
 which is only limited to the subject of `when`.
 For example, if we forget the last `else` in the example introduced at the beginning of this proposal, we should get:
@@ -306,103 +308,6 @@ For example, if we forget the last `else` in the example introduced at the begin
 error: 'when' expression must be exhaustive.
 Add the necessary 'is Error if status.problem == UNKNOWN' branch,
 or 'else' branch instead.
-```
-
-We propose extending the current exhaustiveness check analysis to account not only for the type of the subject
-but also every [stable reference](https://kotlinlang.org/spec/type-inference.html#smart-cast-sink-stability)
-appearing on it. That includes immutable properties, among others.
-
-Furthermore, the [exhaustiveness check](https://kotlinlang.org/spec/expressions.html#exhaustive-when-expressions)
-is extended to work on every kind of `when` expression, not only those with subject. 
-Note that the requirement of whether a `when` expression must be exhaustive or not
-in a particular position in the code is _not_ modified.
-
-In the following description, we assume that every `when` expression has been written or
-translated to a form in which each branch is headed by a conjunction of expressions, or
-is simply `else`.
-
-```kotlin
-when {
-  e1 && e2 && ... ->
-  f1 && f2 && ... ->
-  ...
-}
-```
-
-The exhaustiveness check may consider only those branches in which _every_ condition is of
-one of the following forms.
-
-- `r == <literal>` or `r == <enum entry>`,
-- `r is Type`,
-- `r == null` or `r != null`,
-- `r` or `!r`, if `r` is of Boolean type,
-
-and where `r` is a _reference_, that is, is either the original subject of the `when` expression,
-or a stable reference.
-
-If should then proceed to check that the cartesian product of all the potential types of the
-references are _covered_, as per the current exhaustiveness check. For example, the following should
-be considered exhaustive:
-
-```kotlin
-fun f(x: Int?, y: Int?): Int = when {
-  x == null && y == null -> 0
-  x != null && y == null -> x
-  x == null && y != null -> y
-  x != null && y != null -> x + y
-}
-```
-
-This proposal does not mandate a particular implementation. However, this is a potential algorithm.
-First, we extract all the references in the remaining expressions and perform a topological sort,
-so that `x` appears before `x.property`. Then we execute `coveredBy(references, branchConditions)`,
-given by the following pseudocode.
-
-```kotlin
-coveredBy(<empty list>, _) = OK
-coveredBy(r + rest, branchConditions) {
-  val useful = branchConditions.filter { r appears }
-  val groups = group(branchConditions) { condition on r }
-
-  val coveredConditions = mutableListOf()
-  for ((condition, group) in groups) {
-    val smallerConditions = group.map { remove condition from it }
-    if coveredBy(rest, smallerConditions) {
-      coveredConditions.add(condition)
-    }
-  }
-
-  if !(coveredCondition covers type(r)) FAIL
-}
-```
-
-The previous example using `x` and `y` would proceed as follows:
-
-```
-coveredBy([x, y], [x == null && y == null, ...])
--> go with r = x
-  -> group with x == null
-  |  smallerConditions = [ y == null, y != null ]
-  |
-  | -> coveredBy([y], [ y == null, y != null ])
-  |   -> go with r = y
-  |   | -> group with y == null
-  |   |    smallerConditions = [] -> OK
-  |   | -> group with y != null
-  |   |    smallerConditions = [] -> OK
-  | 
-  | -> add x == null to coveredConditions
-
-  -> group with x != null
-  |  smallerConditions = [ y == null, y != null ]
-  |
-  | -> coveredBy([y], [ y == null, y != null ])
-  |    // same as above
-  | -> add x != null to coveredConditions
-
-  -> does [ x == null, x != null ] cover `Int?`
-  | -> YES
-  -> return OK
 ```
 
 ## Potential extensions
