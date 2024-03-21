@@ -185,7 +185,7 @@ whenEntryGuard: 'if' {NL} expression
 
 Entries with a guard may only appear in `when` expressions with a subject.
 
-The behavior of a `when` expression with guards is equivalent to the same expression in which the subject has been inlined in every location, `if` has been replaced by `&&`, and `else` by `true` (or more succinctly, `else` if` is replaced by the expression following it). The first version of the motivating example is equivalent to:
+The behavior of a `when` expression with guards is equivalent to the same expression in which the subject has been inlined in every location, `if` has been replaced by `&&`, the guard parenthesized, and `else` by `true` (or more succinctly, `else` if` is replaced by the expression following it). The first version of the motivating example is equivalent to:
 
 ```kotlin
 fun render(status: Status): String = when {
