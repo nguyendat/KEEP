@@ -177,7 +177,7 @@ We extend the syntax of `whenEntry` in the following way.
 whenEntry : whenCondition [{NL} whenEntryAddition] {NL} '->' {NL} controlStructureBody [semi]
           | 'else' [ whenEntryGuard ] {NL} '->' {NL} controlStructureBody [semi]
 
-whenEntryAddition: ',' [ {NL} whenCondition { {NL} ',' {NL} whenCondition} ] 
+whenEntryAddition: ',' [ {NL} whenCondition { {NL} ',' {NL} whenCondition} [ {NL} ',' ] ] 
                  | whenEntryGuard
 
 whenEntryGuard: 'if' {NL} expression
