@@ -46,7 +46,7 @@ with subject to describe the control flow of the program.
 fun render(status: Status): String = when (status) {
     Status.Loading -> "loading"
     is Status.Error -> "error: ${status.problem}"
-    is Status.Ok -> status.info.jointToString()
+    is Status.Ok -> status.info.joinToString()
 }
 ```
 
