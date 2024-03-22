@@ -216,8 +216,8 @@ when (status) {
 }
 ```
 
-We strongly suggest writing parentheses around Boolean expressions after `if` as a way to
-clarify the situation.
+We strongly suggest writing parentheses around Boolean expressions after `if` 
+when they consist of more than one term, as a way to clarify the situation.
 
 ```kotlin
 when (status) {
