@@ -234,7 +234,7 @@ Alas, this creates a problem with the current grammar, which allows _any_ expres
 ```kotlin
 fun weird(x: Int) = when (x) {
   0 -> "a"
-  if (something()) 1 else 2 -> "b"
+  if (something()) 1 else 2 -> "b" // `if` here is not a guard, but a value to compare `x` with.
   else -> "c"
 }
 ```
