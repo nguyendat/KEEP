@@ -20,7 +20,7 @@ We propose an extension of branches in `when` expressions with subject, which un
   * [Style guide](#style-guide)
   * [The need for `else`](#the-need-for-else)
   * [Alternative syntax using `&&`](#alternative-syntax-using-)
-* [Exhaustiveness checking](#exhaustiveness-checking)
+  * [Exhaustiveness checking](#exhaustiveness-checking)
 * [Potential extensions](#potential-extensions)
 
 ## Motivating example
@@ -296,19 +296,13 @@ On the one hand, `false && false` could be evaluated to `false` and then
 compared with `b`. On the other hand, `b` can be compared with `false` first,
 and then check the guard -- so the code is actually unreachable.
 
-## Exhaustiveness checking
+### Exhaustiveness checking
 
-> Exhaustiveness checking has been separated to a different proposal.
+> A previous version of this proposal contained also an improved exhaustiveness check.
+> It has been decided to make this a separate proposal, leaving the simplest solution in this KEEP.
 
-Cases like `Status::render` above point out that we may want more powerful exhaustiveness checking that we have now,
-which is only limited to the subject of `when`.
-For example, if we forget the last `else` in the example introduced at the beginning of this proposal, we should get:
-
-```kotlin
-error: 'when' expression must be exhaustive.
-Add the necessary 'is Error if status.problem == UNKNOWN' branch,
-or 'else' branch instead.
-```
+The [exhaustiveness check](https://kotlinlang.org/spec/expressions.html#exhaustive-when-expressions) for `when`
+expressions should not take branches with guards into consideration.
 
 ## Potential extensions
 
