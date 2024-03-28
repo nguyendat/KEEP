@@ -15,14 +15,16 @@ We propose an extension of branches in `when` expressions with subject, which un
 * [Abstract](#abstract)
 * [Table of contents](#table-of-contents)
 * [Motivating example](#motivating-example)
+  * [Exhaustiveness](#exhaustiveness)
   * [Clarity over power](#clarity-over-power)
   * [One little step](#one-little-step)
 * [Technical details](#technical-details)
   * [Style guide](#style-guide)
   * [The need for `else`](#the-need-for-else)
   * [Alternative syntax using `&&`](#alternative-syntax-using-)
-  * [Exhaustiveness checking](#exhaustiveness-checking)
 * [Potential extensions](#potential-extensions)
+  * [De-duplication of heads](#de-duplication-of-heads)
+  * [Abbreviated access to subject members](#abbreviated-access-to-subject-members)
 
 ## Motivating example
 
@@ -120,6 +122,32 @@ fun render(status: Status): String = when {
 The Kotlin compiler provides more examples of this pattern, like
 [this one](https://github.com/JetBrains/kotlin/blob/112473f310b9491e79592d4ba3586e6f5da06d6a/compiler/fir/resolve/src/org/jetbrains/kotlin/fir/resolve/calls/Candidate.kt#L188)
 during candidate resolution.
+
+### Exhaustiveness
+
+Given that guards may include any expression, branches including a guard should
+be ignored for the purposes of [exhaustiveness](https://kotlinlang.org/spec/expressions.html#exhaustive-when-expressions).
+If you need to ensure that you have covered every case when nested properties are
+involved, we recommend using nested conditionals instead.
+
+```kotlin
+// don't do this
+when (status) {
+    is Status.Error && status.problem == Problem.CONNECTION -> ...
+    is Status.Error && status.problem == Problem.AUTHENTICATION -> ...
+    is Status.Error && status.problem == Problem.UNKNOWN -> ...
+    // the compiler requires an additional 'is Status.Error' case
+}
+
+// better do this
+when (status) {
+    is Status.Error -> when (status.problem) {
+        Problem.CONNECTION -> ...
+        Problem.AUTHENTICATION -> ...
+        Problem.UNKNOWN -> ...
+    }
+}
+```
 
 ### Clarity over power
 
@@ -226,6 +254,13 @@ when (status) {
 }
 ```
 
+Another option would have been to mandate parentheses in every guard. There are three reasons
+why we have chosen the more liberal approach.
+
+1. For small expressions, it removes some clutter; otherwise, you end up with `) -> {` in the branch,
+2. Other languages (like Java or C#) do not require them (although most of them use a different keyword than regular conditionals),
+3. People can still use parentheses if they want, or mandate them in their style guide. But the converse is not true.
+
 ### The need for `else`
 
 The current document proposes using `else if` when there is no matching in the subject, only a side condition.
@@ -297,15 +332,43 @@ On the one hand, `false && false` could be evaluated to `false` and then
 compared with `b`. On the other hand, `b` can be compared with `false` first,
 and then check the guard -- so the code is actually unreachable.
 
-### Exhaustiveness checking
-
-> A previous version of this proposal contained also an improved exhaustiveness check.
-> It has been decided to make this a separate proposal, leaving the simplest solution in this KEEP.
-
-The [exhaustiveness check](https://kotlinlang.org/spec/expressions.html#exhaustive-when-expressions) for `when`
-expressions should not take branches with guards into consideration.
-
 ## Potential extensions
+
+### De-duplication of heads
+
+The examples used throughout this document sometimes repeat the condition
+before the guard. At first sight, it seems possible to de-duplicate some of
+those checks, so they are performed only once. In our first example, we
+may de-duplicate the check for `Status.Ok`:
+
+```kotlin
+fun render(status: Status): String = when (status) {
+    Status.Loading -> "loading"
+    is Status.Ok -> when {
+        status.info.isEmpty() -> "no data"
+        else -> status.info.joinToString()
+    }
+    is Status.Error if status.problem == Problem.CONNECTION ->
+      "problems with connection"
+    is Status.Error if status.problem == Problem.AUTHENTICATION ->
+      "could not be authenticated"
+    else -> "unknown problem"
+}
+```
+
+Two challenges make this de-duplication harder than it seems at first sight.
+First of all, you need to ensure that the program produces exactly the same
+result regardless of evaluating the condition once or more than once. While
+knowing this is trivial for a subset of expressions (for example, type checks),
+in its most general form a condition may contain function calls or side effects.
+
+The second challenge is what to do with cases like `Status.Error` above,
+where some conditions fall through to the `else`. Although a sufficiently good
+compiler could generate some a "jump" to the `else` to avoid duplicating some
+code, the rest of the language would still need to be aware of that possibility
+to provide correct code analysis.
+
+### Abbreviated access to subject members
 
 We have considered an extension to provide access to members in the subject within the condition.
 For example, you would not need to write `status.info.isNotEmpty()` in the second of the examples.
