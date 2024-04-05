@@ -4,6 +4,7 @@
 * **Authors**: Alejandro Serrano Mena
 * **Discussion**: ??
 * **Prototype**: Implemented in [this branch](https://github.com/JetBrains/kotlin/compare/rr/serras/escape-dollar)
+* **Related YouTrack issue**: [KT-2425](https://youtrack.jetbrains.com/issue/KT-2425/Provide-a-way-for-escaping-the-dollar-sign-symbol-in-multiline-strings-and-string-templates)
 
 ## Abstract
 
@@ -25,9 +26,15 @@ Strings are one of the fundamental types in Kotlin, developers routinely create 
 [Kotlin's multiline strings](https://kotlinlang.org/docs/strings.html#multiline-strings) are raw, that is, every character from the start to the end markers is taken as it appears. In particular, there are no escaping sequences (`\n`, `\t`, ...) as found in single-line strings. Still, `$` is used to mark interpolation, and `""""` is used to mark the end of the string. If you need those characters in the string, the most often used workaround is to interpolate the character, leading to an awkward sequence of characters.
 
 ```kotlin
-val s = """
-        ${order.price}${'$'}
-        """
+// this is a simple order class
+val order = Order(product = "Guitar", price = 120)
+// somewhere we want to show it to the user
+val receiptAmount = """
+                    ${order.price}${'$'}
+                    """
+
+println(receiptAmount)
+// 120$
 ```
 
 This workaround has additional (bad) consequences if in the future Kotlin implements a feature akin to string templates. That `'$'` character would appear as one of the interpolated values, instead of as "static part" of the string.
@@ -49,6 +56,15 @@ Every multiline string literal **begins** with a sequence of zero or more `$` sy
 **Interpolation** is done using the same amount of `$` symbols as the one heading the string.
 
 * Or with exactly one `$` if none are heading, which is the current behavior.
+  
+```kotlin
+val receiptAmount = $$"""
+                    $${order.price}$
+                    """
+
+println(receiptAmount)
+// 120$
+```
 
 Marking the **end of the string** is done using as many `"` symbols as those beginning the string.
 
@@ -57,7 +73,13 @@ Marking the **end of the string** is done using as many `"` symbols as those beg
 Note that multiline strings already allow one or two quote symbols within the string.
 
 ```kotlin
-val p = """$actor said "$message"."""
+val actor = "Ryan Gosling"
+val message = "I'm Kenough"
+
+val result = """$actor said "$message"."""
+
+println(result)
+// Ryan Gosling said "I'm Kenough".
 ```
 
 ### Single-line string literals
@@ -65,13 +87,19 @@ val p = """$actor said "$message"."""
 Single-line strings have their own ways of escaping those symbols, using a backslash,
 
 ```kotlin
-val r = "$thing costs $price\$"
+val amount = "${order.product} costs ${order.price}\$"
+
+println(amount)
+// Guitar costs 120$
 ```
 
 For the sake of uniformity, we extend single-line string literals with the `$` escaping policy described above.
 
 ```kotlin
-val r = $$"$$thing costs $$price$"
+val amount = $$"$${order.product} costs $${order.price}$"
+
+println(amount)
+// Guitar costs 120$
 ```
 
 This feature has some use cases, like [better interoperability with i18n software](https://youtrack.jetbrains.com/issue/KT-7258/String-interpolation-plays-badly-with-i18n-and-string-positioning).
