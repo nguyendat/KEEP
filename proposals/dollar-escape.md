@@ -34,7 +34,9 @@ val receiptAmount = """
                     """
 
 println(receiptAmount)
-// 120$
+// 
+//                    120$
+//
 ```
 
 This workaround has additional (bad) consequences if in the future Kotlin implements a feature akin to string templates. That `'$'` character would appear as one of the interpolated values, instead of as "static part" of the string.
@@ -63,7 +65,9 @@ val receiptAmount = $$"""
                     """
 
 println(receiptAmount)
-// 120$
+// 
+//                    120$
+//
 ```
 
 Marking the **end of the string** is done using as many `"` symbols as those beginning the string.
