@@ -2,7 +2,7 @@
 
 * **Type**: Design proposal
 * **Authors**: Alejandro Serrano Mena
-* **Discussion**: ??
+* **Discussion**: [KEEP-375](https://github.com/Kotlin/KEEP/issues/375)
 * **Prototype**: Implemented in [this branch](https://github.com/JetBrains/kotlin/compare/rr/serras/escape-dollar)
 * **Related YouTrack issue**: [KT-2425](https://youtrack.jetbrains.com/issue/KT-2425/Provide-a-way-for-escaping-the-dollar-sign-symbol-in-multiline-strings-and-string-templates)
 
@@ -15,9 +15,9 @@ We propose an extension of string literal syntax to improve the situation around
 * [Abstract](#abstract)
 * [Table of Contents](#table-of-contents)
 * [Motivating examples](#motivating-examples)
-    * [Additional requirements](#additional-requirements)
+  * [Additional requirements](#additional-requirements)
 * [Proposed solution](#proposed-solution)
-    * [Single-line string literals](#single-line-string-literals)
+  * [Single-line string literals](#single-line-string-literals)
 * [Alternatives](#alternatives)
 
 ## Motivating examples
